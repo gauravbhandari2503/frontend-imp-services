@@ -1,0 +1,17 @@
+{
+  "common": {
+    "welcome": "Welcome, {name}!",
+    "login": "Login",
+    "logout": "Logout",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "stats": "Statistics"
+  },
+  "errors": {
+    "network": "Network error occurred.",
+    "required": "{field} is required."
+  }
+}
