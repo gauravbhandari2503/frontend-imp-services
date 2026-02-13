@@ -11,6 +11,7 @@ export interface AppConfig {
   region: RegionConfig;
   features: Record<string, boolean>;
   logLevel: "debug" | "info" | "warn" | "error" | "none";
+  googleClientId?: string;
 }
 
 declare global {
@@ -59,6 +60,7 @@ export class EnvironmentConfigService {
       enableAnalytics: env.VITE_ENABLE_ANALYTICS === "true",
       enableMonitoring: env.VITE_ENABLE_MONITORING === "true",
       logLevel: (env.VITE_LOG_LEVEL as any) || (env.DEV ? "debug" : "info"),
+      googleClientId: env.VITE_GOOGLE_CLIENT_ID,
     };
 
     const runtimeConfig =
