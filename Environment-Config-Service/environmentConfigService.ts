@@ -7,6 +7,7 @@ export interface RegionConfig {
 export interface AppConfig {
   apiUrl: string;
   enableAnalytics: boolean;
+  enableMonitoring: boolean;
   region: RegionConfig;
   features: Record<string, boolean>;
   logLevel: "debug" | "info" | "warn" | "error" | "none";
@@ -43,6 +44,7 @@ export class EnvironmentConfigService {
     const defaults: AppConfig = {
       apiUrl: "http://localhost:3000/api",
       enableAnalytics: false,
+      enableMonitoring: true,
       region: {
         region: "us",
         currency: "USD",
@@ -55,6 +57,7 @@ export class EnvironmentConfigService {
     const envConfig: Partial<AppConfig> = {
       apiUrl: env.VITE_API_BASE_URL,
       enableAnalytics: env.VITE_ENABLE_ANALYTICS === "true",
+      enableMonitoring: env.VITE_ENABLE_MONITORING === "true",
       logLevel: (env.VITE_LOG_LEVEL as any) || (env.DEV ? "debug" : "info"),
     };
 
