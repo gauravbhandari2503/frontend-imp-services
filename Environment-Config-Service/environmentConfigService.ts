@@ -9,6 +9,7 @@ export interface AppConfig {
   enableAnalytics: boolean;
   region: RegionConfig;
   features: Record<string, boolean>;
+  logLevel: "debug" | "info" | "warn" | "error" | "none";
 }
 
 declare global {
@@ -37,7 +38,7 @@ export class EnvironmentConfigService {
    * Priority: Window Config (Runtime) > Environment Variables (Build) > Defaults
    */
   private loadConfig(): AppConfig {
-    const env = import.meta.env;
+    const env = import.meta.env || {};
 
     const defaults: AppConfig = {
       apiUrl: "http://localhost:3000/api",
@@ -48,14 +49,17 @@ export class EnvironmentConfigService {
         locale: "en-US",
       },
       features: {},
+      logLevel: "info",
     };
 
     const envConfig: Partial<AppConfig> = {
       apiUrl: env.VITE_API_BASE_URL,
       enableAnalytics: env.VITE_ENABLE_ANALYTICS === "true",
+      logLevel: (env.VITE_LOG_LEVEL as any) || (env.DEV ? "debug" : "info"),
     };
 
-    const runtimeConfig = window.__CONFIG__ || {};
+    const runtimeConfig =
+      (typeof window !== "undefined" && window.__CONFIG__) || {};
 
     // Deep merge could be implemented here if needed for nested objects like features/region
     return {
