@@ -1,9 +1,19 @@
 {
-  "name": "frontend-services",
-  "version": "1.0.0",
+  "name": "@gaurav_bhandari/common-frontend-services",
+  "version": "1.0.2",
   "main": "index.js",
+  "bin": {
+    "frontend-services": "./dist/bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "src/services"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "cli": "npx tsx bin/cli.ts"
   },
   "keywords": [],
   "author": "",
@@ -11,8 +21,19 @@
   "description": "",
   "dependencies": {
     "axios": "^1.13.5",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "idb": "^8.0.3"
+    "fs-extra": "^11.3.0",
+    "idb": "^8.0.3",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^25.2.3",
+    "@types/prompts": "^2.4.9",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

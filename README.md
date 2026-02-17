@@ -2,6 +2,32 @@
 
 A comprehensive collection of framework-agnostic frontend services designed for scalability, maintainability, and performance.
 
+## 🚀 Quick Usage (CLI)
+
+This package provides a CLI to easily discover and install services directly into your project.
+
+### 1️⃣ List Available Services
+
+To see all the services you can install, run:
+
+```bash
+npx --package @gaurav_bhandari/common-frontend-services frontend-services list
+```
+
+### 2️⃣ Install a Service
+
+To add a specific service (e.g., `logger`, `api`) to your project, run:
+
+```bash
+npx --package @gaurav_bhandari/common-frontend-services frontend-services add <service-name>
+```
+
+**Example:**
+
+```bash
+npx --package @gaurav_bhandari/common-frontend-services frontend-services add logger
+```
+
 ## 📦 Services Overview
 
 This repository contains the following services. Each service directory includes its own `docs` folder with detailed usage instructions and examples.
