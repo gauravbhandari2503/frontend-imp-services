@@ -65,15 +65,25 @@ export class FeatureFlagService {
     return { ...this.flags };
   }
 
-  private async fetchFlags(): Promise<void> {
+  private async fetchFlags(retries = 3, delay = 1000): Promise<void> {
     try {
       // Assuming GET /feature-flags returns { "flag-name": true, ... }
-      // Adjust endpoint as needed
       this.flags =
         await BaseService.get<Record<string, boolean>>("feature-flags");
     } catch (error) {
-      console.error("Failed to fetch feature flags:", error);
-      // Fallback strategies could go here (e.g. use cached values)
+      if (retries > 0) {
+        console.warn(
+          `Failed to fetch feature flags. Retrying in ${delay}ms... (${retries} attempts left)`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return this.fetchFlags(retries - 1, delay * 2);
+      } else {
+        console.error(
+          "Failed to fetch feature flags after multiple attempts:",
+          error,
+        );
+        // Fallback strategies could go here (e.g. use cached values or defaults)
+      }
     }
   }
 }

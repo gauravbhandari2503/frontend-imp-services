@@ -13,8 +13,9 @@ interface SetOptions {
 
 export class CacheService {
   private static instance: CacheService;
-  private memoryCache: Map<string, CacheEntry<any>>;
-  private defaultTTL = 5 * 60 * 1000; // 5 minutes
+  private memoryCache: Map<string, CacheEntry<unknown>>;
+  private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes
+  private readonly maxSize: number = 100; // LRU Max Size
 
   private constructor() {
     this.memoryCache = new Map();
@@ -35,9 +36,13 @@ export class CacheService {
 
     // 1. Check L1 (Memory)
     if (this.memoryCache.has(key)) {
-      const entry = this.memoryCache.get(key);
+      const entry = this.memoryCache.get(key) as CacheEntry<T>;
+
       if (entry && entry.expiry > now) {
         loggerService.debug(`[Cache] L1 Hit: ${key}`);
+        // LRU: Refresh usage by moving to end of Map
+        this.memoryCache.delete(key);
+        this.memoryCache.set(key, entry);
         return entry.value;
       } else {
         loggerService.debug(`[Cache] L1 Miss (Expired): ${key}`);
@@ -54,8 +59,8 @@ export class CacheService {
       if (entry) {
         if (entry.expiry > now) {
           loggerService.debug(`[Cache] L2 Hit: ${key}`);
-          // Promote to L1 for faster access
-          this.memoryCache.set(key, entry);
+          // Promote to L1
+          this.setL1(key, entry);
           return entry.value;
         } else {
           loggerService.debug(`[Cache] L2 Miss (Expired): ${key}`);
@@ -82,7 +87,7 @@ export class CacheService {
     const entry: CacheEntry<T> = { value, expiry };
 
     // 1. Write to L1
-    this.memoryCache.set(key, entry);
+    this.setL1(key, entry);
 
     // 2. Write to L2 (if requested)
     if (options.persist) {
@@ -92,6 +97,21 @@ export class CacheService {
         loggerService.error(`[Cache] L2 Write Error: ${key}`, error);
       }
     }
+  }
+
+  /**
+   * Internal helper to set L1 cache with LRU eviction
+   */
+  private setL1(key: string, entry: CacheEntry<unknown>): void {
+    // If updating existing, delete first to move to end
+    if (this.memoryCache.has(key)) {
+      this.memoryCache.delete(key);
+    } else if (this.memoryCache.size >= this.maxSize) {
+      // Evict oldest (first item in Map)
+      const oldestKey = this.memoryCache.keys().next().value;
+      if (oldestKey) this.memoryCache.delete(oldestKey);
+    }
+    this.memoryCache.set(key, entry);
   }
 
   /**

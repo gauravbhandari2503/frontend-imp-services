@@ -13,6 +13,30 @@ export interface CompressionOptions {
   type?: "image/jpeg" | "image/png" | "image/webp";
 }
 
+/**
+ * Interface for custom chunked upload strategies (e.g., S3, specific backend protocols).
+ */
+export interface ChunkedUploadAdapter {
+  /**
+   * Initialize the upload.
+   * @returns Promise resolving to an upload ID or context object.
+   */
+  init(file: File): Promise<string>;
+
+  /**
+   * Upload a single chunk.
+   * @param uploadId The ID returned from init
+   * @param chunk The blob of data
+   * @param index Chunk index (0-based)
+   */
+  uploadChunk(uploadId: string, chunk: Blob, index: number): Promise<void>;
+
+  /**
+   * Complete the upload.
+   */
+  complete<T>(uploadId: string): Promise<T>;
+}
+
 export class FileService {
   private static instance: FileService;
 
@@ -41,33 +65,32 @@ export class FileService {
 
   /**
    * Upload a file in chunks.
-   * Useful for large files to ensure reliability and progress tracking.
-   * Assumes backend supports a chunked upload protocol (e.g., separate init, chunk, and complete endpoints).
-   *
-   * This generic implementation assumes a simplified flow:
-   * 1. POST /init -> returns uploadId
-   * 2. POST /chunk -> uploads parts
-   * 3. POST /complete -> assembles file
+   * Supports standard API endpoint (string) or custom adapter.
    */
   public async uploadChunked<T>(
     file: File,
-    baseUrl: string, // e.g., 'videos/upload'
+    destination: string | ChunkedUploadAdapter,
     onProgress?: (progress: UploadProgress) => void,
     chunkSize: number = 5 * 1024 * 1024, // 5MB default
   ): Promise<T> {
     const totalChunks = Math.ceil(file.size / chunkSize);
+    let uploadId: string;
 
     // 1. Initialize
-    const initResponse = await BaseService.post<{ uploadId: string }>(
-      `${baseUrl}/init`,
-      {
-        filename: file.name,
-        totalChunks,
-        totalSize: file.size,
-        contentType: file.type,
-      },
-    );
-    const { uploadId } = initResponse;
+    if (typeof destination === "string") {
+      const initResponse = await BaseService.post<{ uploadId: string }>(
+        `${destination}/init`,
+        {
+          filename: file.name,
+          totalChunks,
+          totalSize: file.size,
+          contentType: file.type,
+        },
+      );
+      uploadId = initResponse.uploadId;
+    } else {
+      uploadId = await destination.init(file);
+    }
 
     let loaded = 0;
 
@@ -77,12 +100,15 @@ export class FileService {
       const end = Math.min(start + chunkSize, file.size);
       const chunk = file.slice(start, end);
 
-      const formData = new FormData();
-      formData.append("chunk", chunk);
-      formData.append("uploadId", uploadId);
-      formData.append("chunkIndex", i.toString());
-
-      await BaseService.post(`${baseUrl}/chunk`, formData);
+      if (typeof destination === "string") {
+        const formData = new FormData();
+        formData.append("chunk", chunk);
+        formData.append("uploadId", uploadId);
+        formData.append("chunkIndex", i.toString());
+        await BaseService.post(`${destination}/chunk`, formData);
+      } else {
+        await destination.uploadChunk(uploadId, chunk, i);
+      }
 
       loaded += chunk.size;
       if (onProgress) {
@@ -95,7 +121,11 @@ export class FileService {
     }
 
     // 3. Complete
-    return BaseService.post<T>(`${baseUrl}/complete`, { uploadId });
+    if (typeof destination === "string") {
+      return BaseService.post<T>(`${destination}/complete`, { uploadId });
+    } else {
+      return destination.complete<T>(uploadId);
+    }
   }
 
   /**

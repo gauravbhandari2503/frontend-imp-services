@@ -1,3 +1,7 @@
+export interface WorkerOptions {
+  timeout?: number;
+}
+
 export class WorkerService {
   private static instance: WorkerService;
 
@@ -12,15 +16,18 @@ export class WorkerService {
 
   /**
    * Execute a function in a web worker.
-   * NOTE: The function `fn` must be "pure" in the sense that it cannot rely on closures
-   * or external variables. It must be self-contained.
+   * NOTE: The function `fn` must be strictly self-contained (no external closures).
    *
-   * @param fn The function to execute. Receives `data` as argument.
+   * @param fn The function to execute.
    * @param data The data to pass to the function.
+   * @param options Execution options (e.g., timeout).
    */
-  public execute<T, R>(fn: (data: T) => R, data: T): Promise<R> {
+  public execute<T, R>(
+    fn: (data: T) => R,
+    data: T,
+    options?: WorkerOptions,
+  ): Promise<R> {
     return new Promise((resolve, reject) => {
-      // Create the worker script
       const code = `
         self.onmessage = function(e) {
           try {
@@ -28,7 +35,7 @@ export class WorkerService {
             const result = fn(e.data);
             self.postMessage({ result, error: null });
           } catch (error) {
-            self.postMessage({ result: null, error: error.message });
+            self.postMessage({ result: null, error: error instanceof Error ? error.message : String(error) });
           }
         };
       `;
@@ -36,40 +43,79 @@ export class WorkerService {
       const blob = new Blob([code], { type: "application/javascript" });
       const url = URL.createObjectURL(blob);
       const worker = new Worker(url);
+      let timeoutId: any;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        worker.terminate();
+        URL.revokeObjectURL(url);
+      };
 
       worker.onmessage = (e) => {
         const { result, error } = e.data;
+        cleanup();
         if (error) {
-          reject(new Error(error));
+          reject(new Error(`Worker execution failed: ${error}`));
         } else {
           resolve(result);
         }
-        // Cleanup
-        worker.terminate();
-        URL.revokeObjectURL(url);
       };
 
       worker.onerror = (e) => {
-        reject(e);
-        worker.terminate();
-        URL.revokeObjectURL(url);
+        cleanup();
+        reject(new Error(`Worker error: ${e.message}`));
       };
 
-      // Send data
+      if (options?.timeout) {
+        timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error(`Worker timed out after ${options.timeout}ms`));
+        }, options.timeout);
+      }
+
       worker.postMessage(data);
     });
   }
 
   /**
-   * Create a long-lived worker from a function.
-   * The function body becomes the worker script.
-   * Useful if you need to maintain state in the worker.
+   * Run a worker from a script file URL.
+   * @param scriptUrl URL of the worker script.
+   * @param data Data to pass.
+   * @param options Execution options.
    */
-  public createWorker(fn: () => void): Worker {
-    const code = `(${fn.toString()})()`;
-    const blob = new Blob([code], { type: "application/javascript" });
-    const url = URL.createObjectURL(blob);
-    return new Worker(url);
+  public runWorker<T, R>(
+    scriptUrl: string,
+    data: T,
+    options?: WorkerOptions,
+  ): Promise<R> {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(scriptUrl);
+      let timeoutId: any;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        worker.terminate();
+      };
+
+      worker.onmessage = (e) => {
+        cleanup();
+        resolve(e.data as R);
+      };
+
+      worker.onerror = (e) => {
+        cleanup();
+        reject(new Error(`Worker error: ${e.message}`));
+      };
+
+      if (options?.timeout) {
+        timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error(`Worker timed out after ${options.timeout}ms`));
+        }, options.timeout);
+      }
+
+      worker.postMessage(data);
+    });
   }
 }
 

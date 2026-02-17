@@ -1,90 +1,66 @@
-// Simple form validation composable-free helper for forms
-// Goal: keep v-text-field usage unchanged (use `:rules="[...]"`) and offer
-// a reactive way to enable/disable submit buttons when all fields are valid.
+import type { RuleFn } from "./rules";
 
-import { computed, isRef, type Ref } from "vue";
-
-// Each field exposes: value ref and its rules (array of functions returning true|string)
-export type Rule<T = any> = (value: T) => true | string;
-
-export type FieldValueSrc<T = any> = Ref<T> | (() => T) | T;
-
-export interface FieldHandle<T = any> {
-  value: FieldValueSrc<T>;
-  rules: Rule<T>[];
-  // Optional external invalid flag (e.g., server-side error)
-  externallyInvalid?: Ref<boolean>;
+export interface FieldConfig<T = any> {
+  rules: RuleFn<T>[];
+  value?: T;
 }
 
-// Normalize value source and touch deps for reactivity
-function readCurrent<T>(src: FieldValueSrc<T>): T {
-  if (isRef(src)) return src.value as T;
-  if (typeof src === "function") return (src as () => T)();
-  return src as T;
+export interface ValidationResult {
+  isValid: boolean;
+  errors: Record<string, string[]>;
 }
 
-// Create a form validator instance
-// Usage:
-// const formA = createFormValidator({
-//   email: { value: emailRef, rules: [required(), email()] },
-//   password: { value: passwordRef, rules: [required(), password()] }
-// });
-// <v-btn :disabled="!formA.isValid">Submit A</v-btn>
-export interface FormValidationInstance {
-  validate: () => boolean;
-  isValid: Readonly<Ref<boolean>>;
-  anyDirty: Readonly<Ref<boolean>>;
-  resetValidation: () => void;
-}
+export class FormValidator<T extends Record<string, any>> {
+  private schema: Record<keyof T, RuleFn[]>;
 
-export function createFormValidator(
-  fields: Record<string, FieldHandle>,
-): FormValidationInstance {
-  const fieldEntries = Object.entries(fields);
+  constructor(schema: Record<keyof T, RuleFn[]>) {
+    this.schema = schema;
+  }
 
-  const computeFieldValid = (fh: FieldHandle): boolean => {
-    const val = readCurrent(fh.value);
-    for (const rule of fh.rules || []) {
-      const res = rule(val);
-      if (res !== true) return false;
-    }
-    if (fh.externallyInvalid?.value) return false;
-    return true;
-  };
+  /**
+   * Validate a full data object against the schema
+   */
+  public validate(data: T): ValidationResult {
+    const errors: Record<string, string[]> = {};
+    let isValid = true;
 
-  const isValid = computed(() => {
-    if (fieldEntries.length === 0) return false;
-    let okAll = true;
-    for (const [, fh] of fieldEntries) {
-      // touch deps
-      readCurrent(fh.value);
-      const _ext = fh.externallyInvalid?.value; // eslint-disable-line @typescript-eslint/no-unused-vars
-      if (!computeFieldValid(fh)) okAll = false;
-    }
-    return okAll;
-  });
+    for (const key in this.schema) {
+      const fieldRules = this.schema[key];
+      const value = data[key];
+      const fieldErrors: string[] = [];
 
-  const anyDirty = computed(() => {
-    let dirty = false;
-    for (const [, fh] of fieldEntries) {
-      const v = readCurrent(fh.value);
-      const nonEmpty = Array.isArray(v)
-        ? v.length > 0
-        : v !== undefined && v !== null && String(v).trim() !== "";
-      if (nonEmpty) dirty = true;
-    }
-    return dirty;
-  });
+      for (const rule of fieldRules) {
+        const result = rule(value);
+        if (result !== true) {
+          fieldErrors.push(
+            typeof result === "string" ? result : "Invalid value",
+          );
+          isValid = false;
+        }
+      }
 
-  const validate = () => isValid.value;
-
-  const resetValidation = () => {
-    for (const [, fh] of fieldEntries) {
-      if (fh.externallyInvalid) {
-        fh.externallyInvalid.value = false;
+      if (fieldErrors.length > 0) {
+        errors[key] = fieldErrors;
       }
     }
-  };
 
-  return { validate, isValid, anyDirty, resetValidation };
+    return { isValid, errors };
+  }
+
+  /**
+   * Validate a single field
+   */
+  public validateField(key: keyof T, value: any): string[] {
+    const rules = this.schema[key] || [];
+    const errors: string[] = [];
+
+    for (const rule of rules) {
+      const result = rule(value);
+      if (result !== true) {
+        errors.push(typeof result === "string" ? result : "Invalid value");
+      }
+    }
+
+    return errors;
+  }
 }

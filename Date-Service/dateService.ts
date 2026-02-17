@@ -1,4 +1,10 @@
-import { format, formatDistanceToNow, parseISO, isValid } from "date-fns";
+import {
+  format,
+  formatDistanceToNow,
+  parseISO,
+  isValid,
+  parse,
+} from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import { enUS } from "date-fns/locale";
 
@@ -48,6 +54,21 @@ export class DateService {
     const d = this.parse(date);
     if (!isValid(d)) return "Invalid Date";
     return formatInTimeZone(d, timeZone, pattern);
+  }
+
+  /**
+   * Parse a date string using a custom format string.
+   * Wrapper around date-fns parse.
+   * @param dateStr The date string to parse
+   * @param formatStr The pattern (e.g. 'dd.MM.yyyy')
+   * @param referenceDate The date to use for missing units (defaults to now)
+   */
+  public parseCustom(
+    dateStr: string,
+    formatStr: string,
+    referenceDate: Date = new Date(),
+  ): Date {
+    return parse(dateStr, formatStr, referenceDate);
   }
 
   /**
