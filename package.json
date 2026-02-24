@@ -1,6 +1,6 @@
 {
   "name": "@gaurav_bhandari/common-frontend-services",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "main": "index.js",
   "bin": {
     "frontend-services": "./dist/bin/cli.js"
@@ -16,9 +16,13 @@
     "cli": "npx tsx bin/cli.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "Gaurav Bhandari",
   "license": "ISC",
-  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gauravbhandari2503/frontend-imp-services"
+  },
+  "description": "A comprehensive collection of framework-agnostic frontend services designed for scalability, maintainability, and performance.",
   "dependencies": {
     "axios": "^1.13.5",
     "chalk": "^4.1.2",
