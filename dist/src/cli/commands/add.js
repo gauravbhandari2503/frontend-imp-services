@@ -70,7 +70,16 @@ async function addCommand(serviceName, options) {
             // We need to find where the package root is.
             // __dirname is .../src/cli/commands
             // package root is .../
-            const packageRoot = path_1.default.resolve(__dirname, "../../..");
+            let packageRoot = path_1.default.resolve(__dirname, "../../..");
+            // If we are running from dist/ (compiled), we need to go up one more level
+            // because the structure is:
+            // Source:   project/src/cli/commands/add.ts
+            // Compiled: project/dist/src/cli/commands/add.js
+            // __dirname in compiled is project/dist/src/cli/commands
+            // ../../.. is project/dist
+            if (path_1.default.basename(packageRoot) === "dist") {
+                packageRoot = path_1.default.resolve(packageRoot, "..");
+            }
             const sourceFile = path_1.default.resolve(packageRoot, "src", fileRelativePath.replace("services/", "services/"));
             // The registry entries start with "services/".
             // let's just resolve from package root for now.
@@ -81,20 +90,19 @@ async function addCommand(serviceName, options) {
             // CHECK: Does "src" exist in the published package?
             // We should ensure "files" in package.json includes "src".
             // Let's assume for this task we are running locally or from a properly built package.
-            const fileName = path_1.default.basename(fileRelativePath);
-            const targetFile = path_1.default.join(installPath, fileName);
+            // Remove "services/" prefix to get the path relative to the services directory
+            // e.g. "services/API-Service/base.ts" -> "API-Service/base.ts"
+            // This ensures we create the "API-Service" folder in the target directory
+            const relativeDestPath = fileRelativePath.replace(/^services\//, "");
+            const targetFile = path_1.default.join(installPath, relativeDestPath);
             // We need to verify source existence
             if (!fs_extra_1.default.existsSync(sourceFile)) {
-                // Try a fallback for local dev vs production build
-                // If we are in dist/, we might need to look elsewhere?
-                // Actually, simplest is to look at adjacent "services" folder if we bundle them.
-                // Let's try to resolve relative to __dirname first if we are in strict mode.
-                // But for now, let's trust the relative path from package root.
+                // ... (warning logic preserved if needed, but for now just logging)
                 console.warn(chalk_1.default.yellow(`Warning: Source file not found at ${sourceFile}`));
                 continue;
             }
             await fs_extra_1.default.copy(sourceFile, targetFile);
-            console.log(`  Created ${chalk_1.default.green(fileName)}`);
+            console.log(`  Created ${chalk_1.default.green(relativeDestPath)}`);
         }
         console.log(chalk_1.default.bold.green("\nService added successfully! 🚀"));
     }

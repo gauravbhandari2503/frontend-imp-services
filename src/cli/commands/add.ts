@@ -97,7 +97,16 @@ export async function addCommand(
       // __dirname is .../src/cli/commands
       // package root is .../
 
-      const packageRoot = path.resolve(__dirname, "../../..");
+      let packageRoot = path.resolve(__dirname, "../../..");
+      // If we are running from dist/ (compiled), we need to go up one more level
+      // because the structure is:
+      // Source:   project/src/cli/commands/add.ts
+      // Compiled: project/dist/src/cli/commands/add.js
+      // __dirname in compiled is project/dist/src/cli/commands
+      // ../../.. is project/dist
+      if (path.basename(packageRoot) === "dist") {
+        packageRoot = path.resolve(packageRoot, "..");
+      }
       const sourceFile = path.resolve(
         packageRoot,
         "src",
@@ -116,18 +125,15 @@ export async function addCommand(
 
       // Let's assume for this task we are running locally or from a properly built package.
 
-      const fileName = path.basename(fileRelativePath);
-      const targetFile = path.join(installPath, fileName);
+      // Remove "services/" prefix to get the path relative to the services directory
+      // e.g. "services/API-Service/base.ts" -> "API-Service/base.ts"
+      // This ensures we create the "API-Service" folder in the target directory
+      const relativeDestPath = fileRelativePath.replace(/^services\//, "");
+      const targetFile = path.join(installPath, relativeDestPath);
 
       // We need to verify source existence
       if (!fs.existsSync(sourceFile)) {
-        // Try a fallback for local dev vs production build
-        // If we are in dist/, we might need to look elsewhere?
-        // Actually, simplest is to look at adjacent "services" folder if we bundle them.
-
-        // Let's try to resolve relative to __dirname first if we are in strict mode.
-        // But for now, let's trust the relative path from package root.
-
+        // ... (warning logic preserved if needed, but for now just logging)
         console.warn(
           chalk.yellow(`Warning: Source file not found at ${sourceFile}`),
         );
@@ -135,7 +141,7 @@ export async function addCommand(
       }
 
       await fs.copy(sourceFile, targetFile);
-      console.log(`  Created ${chalk.green(fileName)}`);
+      console.log(`  Created ${chalk.green(relativeDestPath)}`);
     }
 
     console.log(chalk.bold.green("\nService added successfully! 🚀"));
